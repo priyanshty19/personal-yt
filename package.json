@@ -1,0 +1,39 @@
+{
+  "name": "personal-yt",
+  "version": "0.1.0",
+  "description": "Personal YT — a 100% local macOS desktop player for YouTube Music",
+  "main": "src/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "gen-icon": "node scripts/gen-icon.js",
+    "gen-app-icon": "electron scripts/gen-app-icon.js",
+    "dist": "npm run gen-icon && electron-builder"
+  },
+  "keywords": [
+    "youtube-music",
+    "electron",
+    "macos",
+    "music-player"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^42.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.personalyt.app",
+    "productName": "Personal YT",
+    "files": [
+      "src/**/*",
+      "build/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "icon": "build/icon.icns",
+      "identity": null,
+      "target": "dmg"
+    }
+  }
+}
