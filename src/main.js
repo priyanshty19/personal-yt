@@ -34,8 +34,9 @@ const YTM_URL = 'https://music.youtube.com';
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
-/** @type {BrowserWindow | null} */
-let widgetWindow = null;
+/** @type {BrowserWindow[]} */
+let widgetWindows = [];
+let widgetsVisible = false;
 /** @type {Tray | null} */
 let tray = null;
 
@@ -109,35 +110,26 @@ function send(command, arg) {
   }
 }
 
-// --- Floating mini-player widget --------------------------------------------
+// --- Floating mini-player widget (one bezel per display) --------------------
 
 const WIDGET_W = 340;
 const WIDGET_H = 84;
 
-function pushStateToWidget() {
-  if (widgetWindow && !widgetWindow.isDestroyed()) {
-    widgetWindow.webContents.send('state', state);
+function pushStateToWidgets() {
+  for (const w of widgetWindows) {
+    if (!w.isDestroyed()) w.webContents.send('state', state);
   }
 }
 
-// Park the bezel in the top-right of whichever display the cursor is on, so it
-// appears on the screen you're actually using (not always the primary one).
-function positionWidgetOnActiveDisplay() {
-  if (!widgetWindow || widgetWindow.isDestroyed()) return;
-  const cursor = screen.getCursorScreenPoint();
-  const wa = screen.getDisplayNearestPoint(cursor).workArea;
-  widgetWindow.setBounds({
-    x: wa.x + wa.width - WIDGET_W - 16,
-    y: wa.y + 16,
-    width: WIDGET_W,
-    height: WIDGET_H,
-  });
+function pushProgressToWidgets(payload) {
+  for (const w of widgetWindows) {
+    if (!w.isDestroyed()) w.webContents.send('progress', payload);
+  }
 }
 
-function createWidget() {
-  const cursor = screen.getCursorScreenPoint();
-  const wa = screen.getDisplayNearestPoint(cursor).workArea;
-  widgetWindow = new BrowserWindow({
+function makeWidgetForDisplay(display) {
+  const wa = display.workArea;
+  const win = new BrowserWindow({
     width: WIDGET_W,
     height: WIDGET_H,
     x: wa.x + wa.width - WIDGET_W - 16,
@@ -150,37 +142,63 @@ function createWidget() {
     fullscreenable: false,
     skipTaskbar: true,
     hasShadow: false, // shadow is drawn in CSS so it follows the rounded corners
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'widget-preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
-
-  widgetWindow.loadFile(path.join(__dirname, 'widget.html'));
+  win.loadFile(path.join(__dirname, 'widget.html'));
   // Float above normal windows and follow across Spaces / full-screen apps.
-  widgetWindow.setAlwaysOnTop(true, 'floating');
-  widgetWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-
-  widgetWindow.webContents.on('did-finish-load', pushStateToWidget);
-  widgetWindow.on('closed', () => {
-    widgetWindow = null;
+  win.setAlwaysOnTop(true, 'floating');
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.webContents.on('did-finish-load', () => {
+    if (!win.isDestroyed()) win.webContents.send('state', state);
   });
+  return win;
 }
 
-function toggleWidget() {
-  if (widgetWindow && !widgetWindow.isDestroyed()) {
-    if (widgetWindow.isVisible()) {
-      widgetWindow.hide();
-    } else {
-      positionWidgetOnActiveDisplay();
-      widgetWindow.show();
-      pushStateToWidget();
-    }
-  } else {
-    createWidget();
+function destroyWidgets() {
+  for (const w of widgetWindows) {
+    if (!w.isDestroyed()) w.destroy();
   }
+  widgetWindows = [];
+}
+
+// (Re)build one bezel per connected display.
+function createWidgets() {
+  destroyWidgets();
+  widgetWindows = screen.getAllDisplays().map(makeWidgetForDisplay);
+}
+
+function showWidgets() {
+  if (widgetWindows.length === 0) createWidgets();
+  for (const w of widgetWindows) {
+    if (!w.isDestroyed()) w.showInactive(); // show without stealing focus
+  }
+  widgetsVisible = true;
+  pushStateToWidgets();
+}
+
+function hideWidgets() {
+  for (const w of widgetWindows) {
+    if (!w.isDestroyed()) w.hide();
+  }
+  widgetsVisible = false;
+}
+
+function toggleWidgets() {
+  if (widgetsVisible) hideWidgets();
+  else showWidgets();
   refreshTray();
+}
+
+// Keep one bezel per display when monitors are plugged/unplugged.
+function handleDisplayChange() {
+  if (!widgetsVisible) return;
+  createWidgets();
+  showWidgets();
 }
 
 // --- Tray (menu bar) --------------------------------------------------------
@@ -210,12 +228,9 @@ function buildTrayMenu() {
     { label: 'Previous', click: () => send('previous') },
     { type: 'separator' },
     {
-      label:
-        widgetWindow && widgetWindow.isVisible()
-          ? 'Hide Mini Player'
-          : 'Show Mini Player',
+      label: widgetsVisible ? 'Hide Mini Player' : 'Show Mini Player',
       accelerator: 'CmdOrCtrl+Shift+M',
-      click: toggleWidget,
+      click: toggleWidgets,
     },
     { label: 'Show Personal YT', click: showWindow },
     {
@@ -249,7 +264,7 @@ function registerShortcuts() {
   // own media-key handling, which is what feeds macOS "Now Playing" / Control
   // Center from the page's MediaSession. Letting Chromium own those keys gives
   // us both system media-key control and the Now Playing widget for free.
-  globalShortcut.register('CmdOrCtrl+Shift+M', toggleWidget);
+  globalShortcut.register('CmdOrCtrl+Shift+M', toggleWidgets);
 }
 
 // --- IPC --------------------------------------------------------------------
@@ -257,20 +272,18 @@ function registerShortcuts() {
 ipcMain.on('track-update', (_e, payload) => {
   state = { ...state, ...payload };
   refreshTray();
-  pushStateToWidget();
+  pushStateToWidgets();
 });
 
-// Progress goes straight to the widget (it doesn't affect the tray).
+// Progress goes straight to the widgets (it doesn't affect the tray).
 ipcMain.on('progress-update', (_e, payload) => {
-  if (widgetWindow && !widgetWindow.isDestroyed()) {
-    widgetWindow.webContents.send('progress', payload);
-  }
+  pushProgressToWidgets(payload);
 });
 
 // Commands coming from the mini-player are routed to the YT Music window.
 ipcMain.on('widget-command', (_e, name, arg) => send(name, arg));
 ipcMain.on('widget-close', () => {
-  if (widgetWindow && !widgetWindow.isDestroyed()) widgetWindow.hide();
+  hideWidgets();
   refreshTray();
 });
 
@@ -283,8 +296,10 @@ function setupAppChrome() {
     credits: 'A 100% local macOS desktop player for YouTube Music.',
   });
 
-  // Dock icon (works even when running unpackaged via `npm start`).
-  if (process.platform === 'darwin' && app.dock) {
+  // Dock icon: only set at runtime when running UNPACKAGED (`npm start`), where
+  // there's no bundle icon. In the packaged .app the bundle's icon.icns is the
+  // authoritative Dock icon — overriding it at runtime can blank the tile.
+  if (!app.isPackaged && process.platform === 'darwin' && app.dock) {
     const icon = nativeImage.createFromPath(
       path.join(__dirname, '..', 'build', 'icon.png')
     );
@@ -345,7 +360,7 @@ function setupAppChrome() {
         {
           label: 'Toggle Mini Player',
           accelerator: 'CmdOrCtrl+Shift+M',
-          click: toggleWidget,
+          click: toggleWidgets,
         },
       ],
     },
@@ -384,6 +399,10 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     createTray();
     registerShortcuts();
+
+    // Rebuild the per-display bezels when monitors are plugged/unplugged.
+    screen.on('display-added', handleDisplayChange);
+    screen.on('display-removed', handleDisplayChange);
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
