@@ -115,6 +115,16 @@ function send(command, arg) {
 const WIDGET_W = 340;
 const WIDGET_H = 84;
 
+// Creating an always-on-top "visible on all workspaces" panel flips the app to
+// an accessory (UIElement) policy, which removes the Dock tile. Re-assert the
+// regular policy after such windows are created/changed to keep the Dock icon.
+function ensureRegularPolicy() {
+  if (process.platform === 'darwin') {
+    app.setActivationPolicy('regular');
+    if (app.dock) app.dock.show();
+  }
+}
+
 function pushStateToWidgets() {
   for (const w of widgetWindows) {
     if (!w.isDestroyed()) w.webContents.send('state', state);
@@ -140,7 +150,6 @@ function makeWidgetForDisplay(display) {
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
-    skipTaskbar: true,
     hasShadow: false, // shadow is drawn in CSS so it follows the rounded corners
     show: false,
     webPreferences: {
@@ -170,6 +179,9 @@ function destroyWidgets() {
 function createWidgets() {
   destroyWidgets();
   widgetWindows = screen.getAllDisplays().map(makeWidgetForDisplay);
+  // The panel windows just downgraded the app to accessory — restore Dock tile.
+  ensureRegularPolicy();
+  setTimeout(ensureRegularPolicy, 300); // again, after async panel conversion
 }
 
 function showWidgets() {
@@ -395,6 +407,8 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', showWindow);
 
   app.whenReady().then(() => {
+    ensureRegularPolicy(); // force a normal Dock-present app
+
     setupAppChrome();
     createWindow();
     createTray();
