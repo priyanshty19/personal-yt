@@ -108,20 +108,36 @@ function send(command, arg) {
 
 // --- Floating mini-player widget --------------------------------------------
 
+const WIDGET_W = 340;
+const WIDGET_H = 84;
+
 function pushStateToWidget() {
   if (widgetWindow && !widgetWindow.isDestroyed()) {
     widgetWindow.webContents.send('state', state);
   }
 }
 
+// Park the bezel in the top-right of whichever display the cursor is on, so it
+// appears on the screen you're actually using (not always the primary one).
+function positionWidgetOnActiveDisplay() {
+  if (!widgetWindow || widgetWindow.isDestroyed()) return;
+  const cursor = screen.getCursorScreenPoint();
+  const wa = screen.getDisplayNearestPoint(cursor).workArea;
+  widgetWindow.setBounds({
+    x: wa.x + wa.width - WIDGET_W - 16,
+    y: wa.y + 16,
+    width: WIDGET_W,
+    height: WIDGET_H,
+  });
+}
+
 function createWidget() {
-  const wa = screen.getPrimaryDisplay().workArea;
-  const W = 340;
-  const H = 84;
+  const cursor = screen.getCursorScreenPoint();
+  const wa = screen.getDisplayNearestPoint(cursor).workArea;
   widgetWindow = new BrowserWindow({
-    width: W,
-    height: H,
-    x: wa.x + wa.width - W - 16,
+    width: WIDGET_W,
+    height: WIDGET_H,
+    x: wa.x + wa.width - WIDGET_W - 16,
     y: wa.y + 16,
     frame: false,
     transparent: true,
@@ -154,6 +170,7 @@ function toggleWidget() {
     if (widgetWindow.isVisible()) {
       widgetWindow.hide();
     } else {
+      positionWidgetOnActiveDisplay();
       widgetWindow.show();
       pushStateToWidget();
     }
