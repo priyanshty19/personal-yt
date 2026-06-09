@@ -66,6 +66,9 @@ function createWindow() {
 
   mainWindow.loadURL(YTM_URL);
 
+  // Keep the window title fixed instead of letting the web page overwrite it.
+  mainWindow.on('page-title-updated', (e) => e.preventDefault());
+
   // Open external links (e.g. account pages) in the system browser instead
   // of spawning new app windows.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
