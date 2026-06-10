@@ -12,11 +12,25 @@ controller, a floating mini-player, and macOS Now Playing integration.
 ## Features
 
 - 🎵 **Host window** — the full YouTube Music web player, with login persisted across restarts.
-- 🎛️ **macOS Now Playing** — track + artwork in Control Center and on the lock screen; hardware media keys handled by the OS.
+- 🎛️ **macOS Now Playing** — track + artwork in Control Center and on the lock screen; hardware media keys are handled by the OS.
 - 📊 **Menu-bar controller** — current track + play/pause/next/previous from the menu bar.
-- 🎚️ **Floating mini-player** — a draggable, always-on-top bezel with artwork, title/artist, a seekable progress bar, and controls. Toggle with **⌘⇧M**. Follows you across Spaces and full-screen apps.
+- 🎚️ **Floating mini-player** — a draggable, always-on-top bezel with artwork, title/artist, a seekable progress bar, and controls. Toggle with **⌘⇧M**. It shows on **every display** and floats over **all Spaces, including other apps' full-screen mode** (implemented as an `NSPanel`).
 - 🪟 **Runs in the background** — closing the window keeps it alive in the menu bar.
-- 🍎 **Native macOS feel** — app icon, About panel, and a proper menu.
+- 🍎 **Native macOS feel** — custom app icon, About panel, fixed window title, and a proper app menu.
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `⌘⇧M` | Toggle the floating mini-player (on all Spaces) |
+| `⌘P` | Play / Pause |
+| `⌘→` / `⌘←` | Next / Previous track |
+| Hardware media keys | Play-pause / next / previous (handled by macOS Now Playing) |
+
+## Requirements
+
+- macOS (the prebuilt `.dmg` targets **Apple Silicon / arm64**; rebuild from source for Intel).
+- For development: Node.js + npm (Electron is installed via `npm install`).
 
 ## Run from source
 
@@ -38,12 +52,20 @@ add an Apple Developer signing identity + notarization to the `build` config in
 
 ## How it works
 
-- `src/main.js` — Electron main process: window, tray, menu, mini-player, IPC.
+- `src/main.js` — Electron main process: the host window, tray, app menu, the
+  per-display mini-player panels, global shortcut, and IPC.
 - `src/preload.js` — injected into the YouTube Music page. Reads now-playing info
   from `navigator.mediaSession` + the `<video>` element and drives the page's own
   player controls. No private API is used.
-- `src/widget.*` — the floating mini-player window.
-- `scripts/gen-icon.js` / `scripts/gen-app-icon.js` — generate the menu-bar and app icons.
+- `src/widget.html` / `src/widget.js` / `src/widget-preload.js` — the floating
+  mini-player UI and its isolated bridge to the main process.
+- `scripts/gen-icon.js` / `scripts/gen-app-icon.js` — generate the menu-bar
+  template icon and the app icon (`build/icon.png` → `build/icon.icns`).
+
+A couple of macOS-specific notes baked into `main.js`: hardware acceleration is
+disabled (avoids a GPU-context crash on recent macOS), the `Electron/x` token is
+stripped from the user agent (so Google sign-in works), and the app re-asserts a
+`regular` activation policy so the floating panel never hides the Dock icon.
 
 > ⚠️ YouTube Music has no public API; the page integration is unofficial and may
 > need updating if the site's markup changes.
