@@ -237,6 +237,18 @@ function nowPlayingLabel() {
   return state.artist ? `${state.title} — ${state.artist}` : state.title;
 }
 
+// --- Launch at login --------------------------------------------------------
+
+function isOpenAtLogin() {
+  return app.getLoginItemSettings().openAtLogin;
+}
+
+function toggleOpenAtLogin() {
+  app.setLoginItemSettings({ openAtLogin: !isOpenAtLogin() });
+  refreshTray();
+  applyAppMenu(); // keep the app-menu checkbox in sync with the tray
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     { label: nowPlayingLabel(), enabled: false },
@@ -254,6 +266,13 @@ function buildTrayMenu() {
       click: toggleWidgets,
     },
     { label: 'Show Personal YT', click: showWindow },
+    {
+      label: 'Open at Login',
+      type: 'checkbox',
+      checked: isOpenAtLogin(),
+      click: toggleOpenAtLogin,
+    },
+    { type: 'separator' },
     {
       label: 'Quit',
       click: () => {
@@ -327,11 +346,22 @@ function setupAppChrome() {
     if (!icon.isEmpty()) app.dock.setIcon(icon);
   }
 
+  applyAppMenu();
+}
+
+function applyAppMenu() {
   const menu = Menu.buildFromTemplate([
     {
       label: 'Personal YT',
       submenu: [
         { role: 'about' },
+        { type: 'separator' },
+        {
+          label: 'Open at Login',
+          type: 'checkbox',
+          checked: isOpenAtLogin(),
+          click: toggleOpenAtLogin,
+        },
         { type: 'separator' },
         { role: 'hide' },
         { role: 'hideOthers' },
