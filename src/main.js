@@ -159,9 +159,15 @@ function makeWidgetForDisplay(display) {
     },
   });
   win.loadFile(path.join(__dirname, 'widget.html'));
-  // Float above normal windows and follow across Spaces / full-screen apps.
-  win.setAlwaysOnTop(true, 'floating');
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // 'screen-saver' is the highest level — needed to draw OVER other apps'
+  // full-screen Spaces (a 'floating' window only shows on the regular desktop).
+  win.setAlwaysOnTop(true, 'screen-saver');
+  // Join every Space, including full-screen ones. skipTransformProcessType keeps
+  // the app a normal Dock app (otherwise this call flips it to an accessory).
+  win.setVisibleOnAllWorkspaces(true, {
+    visibleOnFullScreen: true,
+    skipTransformProcessType: true,
+  });
   win.webContents.on('did-finish-load', () => {
     if (!win.isDestroyed()) win.webContents.send('state', state);
   });
