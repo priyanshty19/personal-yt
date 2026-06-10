@@ -7,65 +7,103 @@
     <style>
       :root { color-scheme: dark; }
       * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
-      html, body { height: 100%; background: transparent; overflow: hidden;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      html, body {
+        height: 100%; background: transparent; overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      }
+      body {
+        display: flex; justify-content: center; align-items: flex-start;
+        padding: 10px 10px 34px;   /* bottom room for the drop shadow */
+      }
 
-      /* The whole bezel is draggable except interactive controls. */
+      /* Frosted-glass bezel — whole thing is draggable except controls */
       #bezel {
         -webkit-app-region: drag;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 14px;
-        border-radius: 16px;
-        background: rgba(22, 22, 26, 0.78);
-        backdrop-filter: blur(24px) saturate(150%);
-        -webkit-backdrop-filter: blur(24px) saturate(150%);
-        border: 0.5px solid rgba(255, 255, 255, 0.10);
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
-        color: #fff;
+        position: relative;
+        width: 360px; height: 92px;
+        display: flex; align-items: center; gap: 12px;
+        padding: 0 16px;
+        border-radius: 18px;
+        background: rgba(26, 26, 30, 0.80);
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
+        border: 0.5px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+        color: #e3e2e8;
+        transition: transform 0.15s ease;
+      }
+      /* subtle inner top/left highlight */
+      #bezel::before {
+        content: ""; position: absolute; inset: 0; border-radius: 18px;
+        border-top: 0.5px solid rgba(255,255,255,0.10);
+        border-left: 0.5px solid rgba(255,255,255,0.10);
+        pointer-events: none;
       }
 
       #art {
-        width: 56px; height: 56px; flex: 0 0 56px;
-        border-radius: 10px; object-fit: cover;
-        background: #2a2a30;
+        flex: 0 0 56px; width: 56px; height: 56px;
+        border-radius: 12px; object-fit: cover; background: #2a2a30;
         box-shadow: 0 2px 8px rgba(0,0,0,0.4);
       }
 
-      #mid { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-      #title { font-size: 13px; font-weight: 600; white-space: nowrap;
-        overflow: hidden; text-overflow: ellipsis; }
-      #artist { font-size: 11px; opacity: 0.65; white-space: nowrap;
-        overflow: hidden; text-overflow: ellipsis; }
+      #mid { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;
+        justify-content: center; gap: 6px; }
+      .row { display: flex; align-items: center; justify-content: space-between;
+        gap: 8px; min-width: 0; }
+      .meta { min-width: 0; }
+      #title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+        line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #artist { font-size: 11px; color: #ccc3d9; opacity: 0.75; line-height: 14px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+      /* Heart / like — appears on hover */
+      #like {
+        -webkit-app-region: no-drag;
+        flex: 0 0 auto; opacity: 0; transform: translateX(8px);
+        background: none; border: none; cursor: pointer; padding: 2px;
+        color: #ccc3d9; transition: opacity .25s ease, transform .25s ease, color .15s;
+        display: flex;
+      }
+      #bezel:hover #like { opacity: 0.85; transform: translateX(0); }
+      #like:hover { color: #ff5a73; }
+      #like.liked { opacity: 1; color: #ff3b5c; }
+      #like svg { width: 16px; height: 16px; }
 
       /* Progress bar */
-      #bar { -webkit-app-region: no-drag; height: 4px; border-radius: 2px;
-        background: rgba(255,255,255,0.18); cursor: pointer; position: relative;
-        margin-top: 2px; }
+      #bar { -webkit-app-region: no-drag; position: relative; height: 4px;
+        border-radius: 2px; background: rgba(255,255,255,0.12); cursor: pointer; }
       #fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
-        background: #ff0033; border-radius: 2px; }
+        border-radius: 2px;
+        background: linear-gradient(90deg, #7B2FF7 0%, #2575FC 100%);
+        box-shadow: 0 0 12px rgba(123, 47, 247, 0.45); }
+      #knob { position: absolute; top: 50%; width: 8px; height: 8px; border-radius: 50%;
+        background: #fff; transform: translate(-50%, -50%); opacity: 0;
+        transition: opacity .15s; }
+      #bar:hover #knob { opacity: 1; }
 
-      #controls { display: flex; align-items: center; gap: 6px; }
-      button {
+      /* Right controls */
+      #controls { display: flex; align-items: center; gap: 12px; }
+      button.ctl {
         -webkit-app-region: no-drag;
-        background: transparent; border: none; color: #fff; cursor: pointer;
-        width: 32px; height: 32px; border-radius: 50%;
+        background: transparent; border: none; color: #e3e2e8; cursor: pointer;
+        width: 30px; height: 30px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
-        transition: background 0.15s;
+        transition: background 0.15s, transform 0.1s;
       }
-      button:hover { background: rgba(255,255,255,0.14); }
-      button svg { width: 18px; height: 18px; fill: #fff; }
-      #play { width: 38px; height: 38px; background: rgba(255,255,255,0.12); }
-      #play svg { width: 20px; height: 20px; }
+      button.ctl:hover { background: rgba(255,255,255,0.10); }
+      button.ctl:active { transform: scale(0.9); }
+      button.ctl svg { width: 20px; height: 20px; fill: currentColor; }
+      #play { width: 40px; height: 40px; background: rgba(255,255,255,0.10); }
+      #play:hover { background: rgba(255,255,255,0.18); }
+      #play svg { width: 22px; height: 22px; }
 
       #close {
         -webkit-app-region: no-drag;
-        position: absolute; top: 6px; right: 8px;
+        position: absolute; top: 7px; right: 9px;
         width: 16px; height: 16px; border-radius: 50%;
-        font-size: 11px; line-height: 16px; opacity: 0; color: #fff;
-        background: rgba(255,255,255,0.15);
+        font-size: 10px; line-height: 16px; text-align: center; color: #fff;
+        background: rgba(255,255,255,0.15); border: none; cursor: pointer; opacity: 0;
+        transition: opacity .2s;
       }
       #bezel:hover #close { opacity: 0.7; }
     </style>
@@ -74,24 +112,32 @@
     <div id="bezel">
       <img id="art" alt="" />
       <div id="mid">
-        <div id="title">Not playing</div>
-        <div id="artist"></div>
-        <div id="bar"><div id="fill"></div></div>
+        <div class="row">
+          <div class="meta">
+            <div id="title">Not playing</div>
+            <div id="artist"></div>
+          </div>
+          <button id="like" title="Like">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          </button>
+        </div>
+        <div id="bar"><div id="fill"></div><div id="knob"></div></div>
       </div>
       <div id="controls">
-        <button id="prev" title="Previous">
+        <button class="ctl" id="prev" title="Previous">
           <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
         </button>
-        <button id="play" title="Play/Pause">
+        <button class="ctl" id="play" title="Play/Pause">
           <svg viewBox="0 0 24 24"><path id="playIcon" d="M8 5v14l11-7z"/></svg>
         </button>
-        <button id="next" title="Next">
+        <button class="ctl" id="next" title="Next">
           <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
         </button>
       </div>
       <button id="close" title="Hide">✕</button>
     </div>
-
     <script src="widget.js"></script>
   </body>
 </html>

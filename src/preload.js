@@ -34,7 +34,25 @@ function bestArtwork(meta) {
   return best.src || '';
 }
 
-let last = { title: null, artist: null, isPlaying: null, artwork: null };
+// The player-bar like button renderer; carries a `like-status` attribute.
+function likeRenderer() {
+  return document.querySelector(
+    'ytmusic-player-bar ytmusic-like-button-renderer'
+  );
+}
+
+function isLiked() {
+  const r = likeRenderer();
+  return !!r && r.getAttribute('like-status') === 'LIKE';
+}
+
+let last = {
+  title: null,
+  artist: null,
+  isPlaying: null,
+  artwork: null,
+  liked: null,
+};
 
 function readState() {
   const video = getVideo();
@@ -43,6 +61,7 @@ function readState() {
   const title = meta ? meta.title : '';
   const artist = meta ? meta.artist : '';
   const artwork = bestArtwork(meta);
+  const liked = isLiked();
   // A track is "playing" when the <video> exists and is not paused.
   const isPlaying = !!(video && !video.paused && !video.ended);
 
@@ -50,10 +69,17 @@ function readState() {
     title !== last.title ||
     artist !== last.artist ||
     isPlaying !== last.isPlaying ||
-    artwork !== last.artwork
+    artwork !== last.artwork ||
+    liked !== last.liked
   ) {
-    last = { title, artist, isPlaying, artwork };
-    ipcRenderer.send('track-update', { title, artist, isPlaying, artwork });
+    last = { title, artist, isPlaying, artwork, liked };
+    ipcRenderer.send('track-update', {
+      title,
+      artist,
+      isPlaying,
+      artwork,
+      liked,
+    });
   }
 
   // Progress is sent separately (and more often) so it doesn't churn the tray.
@@ -100,6 +126,16 @@ const commands = {
   seek(fraction) {
     const video = getVideo();
     if (video && video.duration) video.currentTime = fraction * video.duration;
+  },
+  // Thumbs-up the current track via YT Music's own like button.
+  like() {
+    const r = likeRenderer();
+    if (!r) return;
+    const btn =
+      r.querySelector('#button-shape-like button') ||
+      r.querySelector('button[aria-label*="like" i]') ||
+      r.querySelector('.like');
+    if (btn) btn.click();
   },
 };
 

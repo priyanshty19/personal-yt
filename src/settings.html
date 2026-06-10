@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self';" />
+    <style>
+      :root { color-scheme: dark; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        background: #121318; color: #e3e2e8;
+        overflow-y: auto; overflow-x: hidden;
+      }
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+      /* draggable title bar (real traffic lights overlay top-left) */
+      header {
+        -webkit-app-region: drag;
+        height: 44px; display: flex; align-items: center; justify-content: center;
+        background: rgba(18,19,24,0.85);
+        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        position: sticky; top: 0; z-index: 10;
+        font-size: 13px; font-weight: 600;
+      }
+
+      main { padding: 24px; display: flex; flex-direction: column; gap: 28px; }
+
+      .section-label {
+        font-size: 10px; font-weight: 700; color: #71717a;
+        letter-spacing: 0.06em; text-transform: uppercase;
+        margin: 0 0 8px 12px;
+      }
+      .card {
+        background: #1e1f24; border: 1px solid rgba(255,255,255,0.03);
+        border-radius: 12px; overflow: hidden;
+      }
+      .rowitem {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 12px 14px; gap: 12px;
+      }
+      .rowitem + .rowitem { border-top: 1px solid rgba(255,255,255,0.03); }
+      .rowitem .label { font-size: 14px; font-weight: 600; color: #ccc3d9; }
+
+      /* macOS-style switch */
+      .switch {
+        -webkit-app-region: no-drag;
+        width: 38px; height: 22px; border-radius: 999px;
+        background: rgba(255,255,255,0.12); position: relative; cursor: pointer;
+        transition: background 0.25s ease; flex: 0 0 auto;
+      }
+      .switch::after {
+        content: ""; position: absolute; top: 2px; left: 2px;
+        width: 18px; height: 18px; border-radius: 50%; background: #fff;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: transform 0.25s ease;
+      }
+      .switch.on { background: linear-gradient(135deg, #7B2FF7 0%, #2575FC 100%); }
+      .switch.on::after { transform: translateX(16px); }
+
+      /* segmented control */
+      .segmented {
+        -webkit-app-region: no-drag;
+        display: flex; background: rgba(255,255,255,0.05); border-radius: 8px;
+        padding: 2px; width: 200px;
+      }
+      .seg { flex: 1; text-align: center; padding: 5px 0; border-radius: 6px;
+        font-size: 12px; cursor: pointer; color: #ccc3d9; transition: all 0.2s; }
+      .seg.active {
+        background: linear-gradient(135deg, #7B2FF7 0%, #2575FC 100%);
+        color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+      }
+
+      .accent { display: flex; align-items: center; gap: 10px; }
+      .accent .name { font-size: 12px; color: #958da2; }
+      .swatch { width: 20px; height: 20px; border-radius: 50%;
+        background: linear-gradient(135deg, #7B2FF7, #2575FC);
+        box-shadow: 0 0 0 2px rgba(255,255,255,0.1), 0 0 0 4px #121318; }
+
+      .keys { display: flex; gap: 5px; }
+      .keycap {
+        background: rgba(255,255,255,0.1); border-radius: 5px; min-width: 22px;
+        padding: 3px 7px; font-size: 11px; text-align: center;
+        border-bottom: 2px solid rgba(0,0,0,0.25);
+      }
+
+      .about { padding: 24px; display: flex; flex-direction: column;
+        align-items: center; text-align: center; }
+      .logo { width: 60px; height: 60px; border-radius: 16px;
+        background: linear-gradient(135deg, #7B2FF7, #2575FC);
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 14px; box-shadow: 0 8px 20px rgba(123,47,247,0.4); }
+      .logo svg { width: 30px; height: 30px; fill: #fff; }
+      .about h3 { font-size: 18px; font-weight: 600; margin-bottom: 2px; }
+      .about .ver { font-size: 12px; color: #958da2; margin-bottom: 18px; }
+      #github {
+        -webkit-app-region: no-drag;
+        background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+        color: #e3e2e8; padding: 8px 18px; border-radius: 8px; cursor: pointer;
+        font-size: 13px; font-weight: 600; transition: background 0.15s, transform 0.1s;
+      }
+      #github:hover { background: rgba(255,255,255,0.1); }
+      #github:active { transform: scale(0.96); }
+    </style>
+  </head>
+  <body>
+    <header>Personal YT Settings</header>
+    <main>
+      <section>
+        <p class="section-label">General</p>
+        <div class="card">
+          <div class="rowitem">
+            <span class="label">Open at login</span>
+            <div class="switch" id="openAtLogin"></div>
+          </div>
+          <div class="rowitem">
+            <span class="label">Show mini-player on launch</span>
+            <div class="switch" id="showMiniOnLaunch"></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <p class="section-label">Appearance</p>
+        <div class="card">
+          <div class="rowitem">
+            <span class="label">Theme</span>
+            <div class="segmented" id="theme">
+              <div class="seg" data-v="system">System</div>
+              <div class="seg" data-v="dark">Dark</div>
+              <div class="seg" data-v="light">Light</div>
+            </div>
+          </div>
+          <div class="rowitem">
+            <span class="label">Accent Color</span>
+            <div class="accent"><span class="name">Linear Gradient</span><div class="swatch"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <p class="section-label">Shortcuts</p>
+        <div class="card">
+          <div class="rowitem"><span class="label">Toggle mini-player</span>
+            <div class="keys"><span class="keycap">⌘</span><span class="keycap">⇧</span><span class="keycap">M</span></div></div>
+          <div class="rowitem"><span class="label">Play / Pause</span>
+            <div class="keys"><span class="keycap">⌘</span><span class="keycap">P</span></div></div>
+          <div class="rowitem"><span class="label">Next Track</span>
+            <div class="keys"><span class="keycap">⌘</span><span class="keycap">→</span></div></div>
+          <div class="rowitem"><span class="label">Previous Track</span>
+            <div class="keys"><span class="keycap">⌘</span><span class="keycap">←</span></div></div>
+        </div>
+      </section>
+
+      <section>
+        <p class="section-label">About</p>
+        <div class="card about">
+          <div class="logo">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+          <h3>Personal YT</h3>
+          <p class="ver" id="version">Version 0.1.0</p>
+          <button id="github">View on GitHub</button>
+        </div>
+      </section>
+    </main>
+    <script src="settings.js"></script>
+  </body>
+</html>

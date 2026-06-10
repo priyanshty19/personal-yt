@@ -19,11 +19,13 @@ window.widget.onState((s) => {
   }
   isPlaying = !!s.isPlaying;
   $('playIcon').setAttribute('d', isPlaying ? PAUSE : PLAY);
+  $('like').classList.toggle('liked', !!s.liked);
 });
 
 window.widget.onProgress((p) => {
-  const pct = p.duration ? (p.currentTime / p.duration) * 100 : 0;
+  const pct = p.duration ? Math.min(100, (p.currentTime / p.duration) * 100) : 0;
   $('fill').style.width = pct + '%';
+  $('knob').style.left = pct + '%';
 });
 
 // --- Outgoing commands ------------------------------------------------------
@@ -31,9 +33,10 @@ window.widget.onProgress((p) => {
 $('play').addEventListener('click', () => window.widget.command('playPause'));
 $('next').addEventListener('click', () => window.widget.command('next'));
 $('prev').addEventListener('click', () => window.widget.command('previous'));
+$('like').addEventListener('click', () => window.widget.command('like'));
 $('close').addEventListener('click', () => window.widget.close());
 
-// Click the progress bar to seek.
+// Click anywhere on the progress bar to seek.
 $('bar').addEventListener('click', (e) => {
   const rect = $('bar').getBoundingClientRect();
   const fraction = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));

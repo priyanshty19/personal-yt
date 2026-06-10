@@ -8,10 +8,14 @@ const {
   globalShortcut,
   ipcMain,
   nativeImage,
+  nativeTheme,
   screen,
   shell,
 } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+const GITHUB_URL = 'https://github.com/priyanshty19/personal-yt';
 
 // Disable GPU hardware acceleration. On some macOS setups the GPU/compositing
 // process crashes ("renderer-gone: killed"), leaving a black window. This must
@@ -37,8 +41,34 @@ let mainWindow = null;
 /** @type {BrowserWindow[]} */
 let widgetWindows = [];
 let widgetsVisible = false;
+/** @type {BrowserWindow | null} */
+let settingsWindow = null;
 /** @type {Tray | null} */
 let tray = null;
+
+// Persisted settings (openAtLogin lives in the OS, not here).
+const SETTINGS_FILE = () => path.join(app.getPath('userData'), 'settings.json');
+let store = { showMiniPlayerOnLaunch: false, theme: 'system' };
+
+function loadStore() {
+  try {
+    Object.assign(store, JSON.parse(fs.readFileSync(SETTINGS_FILE(), 'utf8')));
+  } catch {
+    /* first run / no file — keep defaults */
+  }
+}
+
+function saveStore() {
+  try {
+    fs.writeFileSync(SETTINGS_FILE(), JSON.stringify(store, null, 2));
+  } catch {
+    /* ignore write errors */
+  }
+}
+
+function applyTheme() {
+  nativeTheme.themeSource = store.theme || 'system';
+}
 
 // Latest playback state reported by the renderer.
 let state = {
@@ -112,8 +142,11 @@ function send(command, arg) {
 
 // --- Floating mini-player widget (one bezel per display) --------------------
 
-const WIDGET_W = 340;
-const WIDGET_H = 84;
+// Window is larger than the 360x92 bezel to leave room for its drop shadow
+// (the bezel is centred inside via CSS padding).
+const WIDGET_W = 380;
+const WIDGET_H = 136;
+const WIDGET_MARGIN = 6;
 
 // Creating an always-on-top "visible on all workspaces" panel flips the app to
 // an accessory (UIElement) policy, which removes the Dock tile. Re-assert the
@@ -142,8 +175,8 @@ function makeWidgetForDisplay(display) {
   const win = new BrowserWindow({
     width: WIDGET_W,
     height: WIDGET_H,
-    x: wa.x + wa.width - WIDGET_W - 16,
-    y: wa.y + 16,
+    x: wa.x + wa.width - WIDGET_W - WIDGET_MARGIN,
+    y: wa.y + WIDGET_MARGIN,
     // 'panel' makes this an NSPanel, the ONLY window kind macOS lets float over
     // another app's full-screen Space. A normal window can't, at any level.
     type: 'panel',
@@ -243,10 +276,52 @@ function isOpenAtLogin() {
   return app.getLoginItemSettings().openAtLogin;
 }
 
-function toggleOpenAtLogin() {
-  app.setLoginItemSettings({ openAtLogin: !isOpenAtLogin() });
+function setOpenAtLogin(on) {
+  app.setLoginItemSettings({ openAtLogin: on });
   refreshTray();
-  applyAppMenu(); // keep the app-menu checkbox in sync with the tray
+  applyAppMenu(); // keep the menu checkboxes in sync
+}
+
+function toggleOpenAtLogin() {
+  setOpenAtLogin(!isOpenAtLogin());
+}
+
+// --- Settings window --------------------------------------------------------
+
+function settingsSnapshot() {
+  return {
+    openAtLogin: isOpenAtLogin(),
+    showMiniPlayerOnLaunch: store.showMiniPlayerOnLaunch,
+    theme: store.theme,
+    version: app.getVersion(),
+  };
+}
+
+function openSettings() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.show();
+    settingsWindow.focus();
+    return;
+  }
+  settingsWindow = new BrowserWindow({
+    width: 480,
+    height: 560,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    title: 'Personal YT Settings',
+    titleBarStyle: 'hidden',
+    backgroundColor: '#121318',
+    webPreferences: {
+      preload: path.join(__dirname, 'settings-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  settingsWindow.loadFile(path.join(__dirname, 'settings.html'));
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
 }
 
 function buildTrayMenu() {
@@ -266,6 +341,7 @@ function buildTrayMenu() {
       click: toggleWidgets,
     },
     { label: 'Show Personal YT', click: showWindow },
+    { label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: openSettings },
     {
       label: 'Open at Login',
       type: 'checkbox',
@@ -327,6 +403,23 @@ ipcMain.on('widget-close', () => {
   refreshTray();
 });
 
+// Settings window IPC.
+ipcMain.handle('settings:get', () => settingsSnapshot());
+ipcMain.handle('settings:set', (_e, patch) => {
+  if (typeof patch.openAtLogin === 'boolean') setOpenAtLogin(patch.openAtLogin);
+  if (typeof patch.showMiniPlayerOnLaunch === 'boolean') {
+    store.showMiniPlayerOnLaunch = patch.showMiniPlayerOnLaunch;
+    saveStore();
+  }
+  if (typeof patch.theme === 'string') {
+    store.theme = patch.theme;
+    applyTheme();
+    saveStore();
+  }
+  return settingsSnapshot();
+});
+ipcMain.on('settings:openGitHub', () => shell.openExternal(GITHUB_URL));
+
 // --- App chrome (icon, About panel, menu) -----------------------------------
 
 function setupAppChrome() {
@@ -356,6 +449,11 @@ function applyAppMenu() {
       submenu: [
         { role: 'about' },
         { type: 'separator' },
+        {
+          label: 'Settings…',
+          accelerator: 'CmdOrCtrl+,',
+          click: openSettings,
+        },
         {
           label: 'Open at Login',
           type: 'checkbox',
@@ -448,10 +546,16 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     ensureRegularPolicy(); // force a normal Dock-present app
 
+    loadStore();
+    applyTheme();
+
     setupAppChrome();
     createWindow();
     createTray();
     registerShortcuts();
+
+    // Optionally pop the mini-player on launch (per Settings).
+    if (store.showMiniPlayerOnLaunch) showWidgets();
 
     // Rebuild the per-display bezels when monitors are plugged/unplugged.
     screen.on('display-added', handleDisplayChange);
