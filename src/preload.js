@@ -12,8 +12,15 @@
 
 const { ipcRenderer } = require('electron');
 
+// YouTube Music can have several <video> elements (the main player plus
+// preview/hover/ad players). Grabbing the first one gives wrong progress, so
+// pick the one that's actually playing — else the longest (the main track).
 function getVideo() {
-  return document.querySelector('video');
+  const vids = Array.from(document.querySelectorAll('video'));
+  if (vids.length <= 1) return vids[0] || null;
+  const playing = vids.find((v) => !v.paused && !v.ended && v.currentTime > 0);
+  if (playing) return playing;
+  return vids.reduce((a, b) => ((b.duration || 0) > (a.duration || 0) ? b : a));
 }
 
 // --- Reading state ----------------------------------------------------------
