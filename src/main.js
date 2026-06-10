@@ -144,6 +144,9 @@ function makeWidgetForDisplay(display) {
     height: WIDGET_H,
     x: wa.x + wa.width - WIDGET_W - 16,
     y: wa.y + 16,
+    // 'panel' makes this an NSPanel, the ONLY window kind macOS lets float over
+    // another app's full-screen Space. A normal window can't, at any level.
+    type: 'panel',
     frame: false,
     transparent: true,
     resizable: false,
